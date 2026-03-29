@@ -1,26 +1,18 @@
 package com.inventory.controller;
 
+import com.inventory.backend.InventoryBackendFacade;
 import com.inventory.model.Product;
 
+import java.util.List;
+
 public class ProductController {
+    private final InventoryBackendFacade backend = InventoryBackendFacade.getInstance();
 
-    public void addProduct(Product product) {
-        try {
-            if (product.getName() == null || product.getName().isEmpty()) {
-                throw new Exception("Product name cannot be empty");
-            }
+    public Product addProduct(Product product) {
+        return backend.addProduct(product);
+    }
 
-            if (product.getQuantity() < 0) {
-                throw new Exception("Quantity cannot be negative");
-            }
-
-            // Dummy logic (no DB)
-            System.out.println("Product Added Successfully:");
-            System.out.println("Name: " + product.getName());
-            System.out.println("Quantity: " + product.getQuantity());
-
-        } catch (Exception e) {
-            System.out.println("Product Error: " + e.getMessage());
-        }
+    public List<Product> getAllProducts() {
+        return backend.getAllProducts();
     }
 }
