@@ -16,12 +16,6 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * JFC: Order management page.
- * JDBC: Loads orders via OrderDAO.
- * EBT: ActionListener (buttons), KeyListener (search).
- * Runtime fix: displayedOrders tracks exactly what is shown in table.
- */
 public class OrderFrame extends JPanel {
 
     private JTable            table;
@@ -29,7 +23,6 @@ public class OrderFrame extends JPanel {
     private JTextField        searchField;
     private JComboBox<String> statusFilter;
 
-    // FIXED: separate displayed list
     private List<OrderBean> allOrders       = new ArrayList<>();
     private List<OrderBean> displayedOrders = new ArrayList<>();
 
@@ -38,6 +31,8 @@ public class OrderFrame extends JPanel {
     private static final String[] COLS = {
         "Order ID","Product","Supplier","Qty","Total ($)","Date","Status","Actions"
     };
+
+    private static final int COL_ACTIONS = 7;
 
     public OrderFrame() {
         setBackground(AppColors.BG_APP);
@@ -87,29 +82,30 @@ public class OrderFrame extends JPanel {
         row.add(chip("Delivered",   "14", AppColors.SUCCESS, AppColors.SUCCESS_BG));
         return row;
     }
-private JPanel chip(String label, String val, Color fg, Color bg) {
+
+    private JPanel chip(String label, String val, Color fg, Color bg) {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 10)) {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(bg);
-                g2.fillRoundRect(0,0,getWidth()-1,getHeight()-1,10,10);
+                g2.fillRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
                 g2.setColor(fg);
                 g2.setStroke(new BasicStroke(1.5f));
-                g2.drawRoundRect(0,0,getWidth()-1,getHeight()-1,10,10);
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 10, 10);
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
         p.setOpaque(false);
         JLabel dot = new JLabel("\u25CF");
-        dot.setFont(new Font("Segoe UI",Font.BOLD,18));
+        dot.setFont(new Font("Segoe UI", Font.BOLD, 18));
         dot.setForeground(fg);
         JPanel txt = new JPanel();
         txt.setOpaque(false);
         txt.setLayout(new BoxLayout(txt, BoxLayout.Y_AXIS));
         JLabel num = new JLabel(val);
-        num.setFont(new Font("Segoe UI",Font.BOLD,18));
+        num.setFont(new Font("Segoe UI", Font.BOLD, 18));
         num.setForeground(AppColors.TEXT_PRIMARY);
         JLabel lbl = new JLabel(label);
         lbl.setFont(AppFonts.SMALL);
@@ -124,11 +120,12 @@ private JPanel chip(String label, String val, Color fg, Color bg) {
         card.setBackground(AppColors.BG_CARD);
         card.setBorder(UIFactory.cardBorder());
 
+        // Toolbar
         JPanel bar = new JPanel(new BorderLayout());
         bar.setBackground(AppColors.BG_CARD);
         bar.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0,0,1,0,AppColors.BORDER),
-            BorderFactory.createEmptyBorder(12,18,12,18)));
+            BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER),
+            BorderFactory.createEmptyBorder(12, 18, 12, 18)));
 
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         left.setOpaque(false);
@@ -167,43 +164,71 @@ private JPanel chip(String label, String val, Color fg, Color bg) {
         bar.add(right, BorderLayout.EAST);
         card.add(bar, BorderLayout.NORTH);
 
+        // Table
         model = new DefaultTableModel(COLS, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         table = new JTable(model);
         UIFactory.styleTable(table);
 
-        int[] widths = {70,155,130,50,100,105,105,110};
+        int[] widths = {70, 155, 130, 50, 100, 105, 105, 120};
         for (int i = 0; i < widths.length; i++)
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
         DefaultTableCellRenderer alt = UIFactory.altRowRenderer();
-for (int i = 0; i < 6; i++) table.getColumnModel().getColumn(i).setCellRenderer(alt);
+        for (int i = 0; i < 6; i++)
+            table.getColumnModel().getColumn(i).setCellRenderer(alt);
+
         table.getColumnModel().getColumn(6).setCellRenderer(UIFactory.badgeRenderer());
-        table.getColumnModel().getColumn(7).setCellRenderer(new ActRenderer());
-        table.getColumnModel().getColumn(7).setCellEditor(new ActEditor(this));
+        table.getColumnModel().getColumn(7).setCellRenderer(new OrderActionsRenderer());
+
+        // ── SINGLE MOUSE LISTENER ─────────────────────────────────────────────
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int row = table.rowAtPoint(e.getPoint());
+                int col = table.columnAtPoint(e.getPoint());
+                if (row < 0) return;
+
+                if (col == COL_ACTIONS) {
+                    Rectangle cellRect = table.getCellRect(row, col, false);
+                    int xInCell  = e.getX() - cellRect.x;
+                    int cellWidth = cellRect.width;
+
+                    // Left half = View, Right half = Cancel
+                    if (xInCell < cellWidth / 2) {
+                        viewOrder(row);
+                    } else {
+                        cancelOrder(row);
+                    }
+                }
+            }
+        });
 
         card.add(UIFactory.scrollPane(table), BorderLayout.CENTER);
         return card;
     }
 
-    // FIXED: also updates displayedOrders
     private void refreshTable(List<OrderBean> list) {
-        displayedOrders = new ArrayList<>(list); // FIXED
+        displayedOrders = new ArrayList<>(list);
         model.setRowCount(0);
         for (OrderBean o : list) {
             model.addRow(new Object[]{
-                "#" + o.getOrderId(), o.getProductName(), o.getSupplierName(),
-                o.getQuantity(), String.format("%.2f", o.getTotalAmount()),
-                o.getOrderDate(), o.getStatus(), "ACTIONS"
+                "#" + o.getOrderId(),
+                o.getProductName(),
+                o.getSupplierName(),
+                o.getQuantity(),
+                String.format("%.2f", o.getTotalAmount()),
+                o.getOrderDate(),
+                o.getStatus(),
+                "View | Cancel"
             });
         }
     }
 
     private void applyFilters() {
-        String q   = searchField  != null ? searchField.getText().toLowerCase() : "";
+        String q   = searchField  != null ? searchField.getText().toLowerCase()     : "";
         String sel = statusFilter != null ? (String) statusFilter.getSelectedItem() : "All Status";
-
         List<OrderBean> filtered = new ArrayList<>();
         for (OrderBean o : allOrders) {
             boolean mQ = o.getProductName().toLowerCase().contains(q)
@@ -219,29 +244,26 @@ for (int i = 0; i < 6; i++) table.getColumnModel().getColumn(i).setCellRenderer(
         dlg.setVisible(true);
         if (dlg.isConfirmed())
             JOptionPane.showMessageDialog(this,
-                "Order placed! Connect DAO for persistence.",
-                "Success", JOptionPane.INFORMATION_MESSAGE);
+                "Order placed!", "Success", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // FIXED: uses displayedOrders.get(row)
-    void viewOrder(int row) {
+    private void viewOrder(int row) {
         if (row < 0 || row >= displayedOrders.size()) return;
-        OrderBean o = displayedOrders.get(row); // FIXED
+        OrderBean o = displayedOrders.get(row);
         JOptionPane.showMessageDialog(this,
-            "Order #"    + o.getOrderId()
-            + "\nProduct:  " + o.getProductName()
-            + "\nSupplier: " + o.getSupplierName()
-            + "\nQty:      " + o.getQuantity()
+            "Order:    #" + o.getOrderId()
+            + "\nProduct:  "  + o.getProductName()
+            + "\nSupplier: "  + o.getSupplierName()
+            + "\nQty:      "  + o.getQuantity()
             + "\nTotal:    $" + String.format("%.2f", o.getTotalAmount())
             + "\nDate:     "  + o.getOrderDate()
             + "\nStatus:   "  + o.getStatus(),
             "Order Details", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // FIXED: uses displayedOrders.get(row)
-    void cancelOrder(int row) {
+    private void cancelOrder(int row) {
         if (row < 0 || row >= displayedOrders.size()) return;
-        OrderBean o = displayedOrders.get(row); // FIXED
+        OrderBean o = displayedOrders.get(row);
         if (!o.isCancellable()) {
             JOptionPane.showMessageDialog(this,
                 "Cannot cancel a " + o.getStatus() + " order.",
@@ -250,94 +272,44 @@ for (int i = 0; i < 6; i++) table.getColumnModel().getColumn(i).setCellRenderer(
         }
         ConfirmDialog dlg = new ConfirmDialog(
             SwingUtilities.getWindowAncestor(this),
-            "Cancel Order", "Cancel order #" + o.getOrderId() + "?");
+            "Cancel Order",
+            "Cancel order #" + o.getOrderId() + "?");
         dlg.setVisible(true);
         if (dlg.isConfirmed()) {
             orderDAO.updateOrderStatus(o.getOrderId(), "CANCELLED");
-            // Update in master list
             for (OrderBean x : allOrders)
-                if (x.getOrderId() == o.getOrderId()) { x.setStatus("CANCELLED"); break; }
+                if (x.getOrderId() == o.getOrderId()) {
+                    x.setStatus("CANCELLED");
+                    break;
+                }
             applyFilters();
         }
     }
 
-    static class ActRenderer implements TableCellRenderer {
-        JPanel p;
-
-        ActRenderer() {
-            p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
-
-            JButton v = new JButton("View");
-            v.setFont(AppFonts.SMALL_BOLD);
-            v.setForeground(AppColors.INFO_TEXT);
-            v.setBackground(AppColors.INFO_BG);
-            v.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-
-            JButton c = new JButton("Cancel");
-            c.setFont(AppFonts.SMALL_BOLD);
-            c.setForeground(AppColors.DANGER_TEXT);
-            c.setBackground(AppColors.DANGER_BG);
-            c.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-
-            p.add(v);
-            p.add(c);
-        }
-
+    static class OrderActionsRenderer implements TableCellRenderer {
+        @Override
         public Component getTableCellRendererComponent(JTable t, Object v,
                 boolean sel, boolean foc, int row, int col) {
-            p.setBackground(row % 2 == 0 ? Color.WHITE : AppColors.BG_ROW_ALT);
-            return p;
+            JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
+            panel.setBackground(row % 2 == 0 ? Color.WHITE : AppColors.BG_ROW_ALT);
+
+            JButton viewBtn = new JButton("View");
+            viewBtn.setFont(AppFonts.SMALL_BOLD);
+            viewBtn.setForeground(AppColors.INFO_TEXT);
+            viewBtn.setBackground(AppColors.INFO_BG);
+            viewBtn.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
+            viewBtn.setFocusPainted(false);
+
+            JButton cancelBtn = new JButton("Cancel");
+            cancelBtn.setFont(AppFonts.SMALL_BOLD);
+            cancelBtn.setForeground(AppColors.DANGER_TEXT);
+            cancelBtn.setBackground(AppColors.DANGER_BG);
+            cancelBtn.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
+            cancelBtn.setFocusPainted(false);
+
+            panel.add(viewBtn);
+            panel.add(cancelBtn);
+            return panel;
         }
     }
-
-    static class ActEditor extends DefaultCellEditor {
-
-        JPanel p;
-        int curRow;
-        OrderFrame frame;
-
-        ActEditor(OrderFrame f) {
-            super(new JCheckBox());
-            setClickCountToStart(1);
-            this.frame = f;
-
-            p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
-
-            JButton v = new JButton("View");
-            v.setFont(AppFonts.SMALL_BOLD);
-            v.setForeground(AppColors.INFO_TEXT);
-            v.setBackground(AppColors.INFO_BG);
-            v.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-            v.setFocusPainted(false);
-            v.addActionListener(e -> {
-                fireEditingStopped();
-                frame.viewOrder(curRow);
-            });
-
-            JButton c = new JButton("Cancel");
-            c.setFont(AppFonts.SMALL_BOLD);
-            c.setForeground(AppColors.DANGER_TEXT);
-            c.setBackground(AppColors.DANGER_BG);
-            c.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-            c.setFocusPainted(false);
-            c.addActionListener(e -> {
-                fireEditingStopped();
-                frame.cancelOrder(curRow);
-            });
-
-            p.add(v);
-            p.add(c);
-        }
-
-        public Component getTableCellEditorComponent(JTable t, Object v,
-                boolean sel, int row, int col) {
-            curRow = row;
-            return p;
-        }
-
-        public Object getCellEditorValue() {
-            return "ACTIONS";
-        }
-    }
-
 }

@@ -16,13 +16,6 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * JFC: Inventory management page with JTable, JTextField, JComboBox.
- * JDBC: Loads products from ProductDAO.
- * EBT: KeyListener (search), ActionListener (buttons), MouseListener (row click).
- * OOPs: Inheritance (extends JPanel), Encapsulation of table state.
- * Runtime fix: displayedProducts tracks exactly what is shown in table.
- */
 public class InventoryFrame extends JPanel {
 
     private JTable            table;
@@ -30,8 +23,6 @@ public class InventoryFrame extends JPanel {
     private JTextField        searchField;
     private JComboBox<String> categoryFilter;
 
-    // allProducts = full master list from DB
-    // displayedProducts = what is currently shown in table (FIXED)
     private List<ProductBean> allProducts       = new ArrayList<>();
     private List<ProductBean> displayedProducts = new ArrayList<>();
 
@@ -41,6 +32,9 @@ public class InventoryFrame extends JPanel {
         "#", "Product Name", "Category", "In Stock", "Reserved",
         "Available", "Reorder", "Stock Bar", "Status", "Actions"
     };
+
+    // Column index for Actions
+    private static final int COL_ACTIONS = 9;
 
     public InventoryFrame() {
         setBackground(AppColors.BG_APP);
@@ -57,7 +51,7 @@ public class InventoryFrame extends JPanel {
         } catch (Exception e) {
             loadSampleData();
         }
-        applyFilters(); // always go through filter so displayedProducts is set
+        applyFilters();
     }
 
     private void loadSampleData() {
@@ -84,7 +78,8 @@ public class InventoryFrame extends JPanel {
         body.add(buildTableCard(),  BorderLayout.CENTER);
         return body;
     }
-private JPanel buildSummaryRow() {
+
+    private JPanel buildSummaryRow() {
         JPanel row = new JPanel(new GridLayout(1, 4, 14, 0));
         row.setOpaque(false);
         row.setPreferredSize(new Dimension(0, 80));
@@ -124,7 +119,7 @@ private JPanel buildSummaryRow() {
         lbl.setForeground(AppColors.TEXT_MUTED);
         txt.add(num); txt.add(lbl);
         p.add(dot, BorderLayout.WEST);
-        p.add(txt, BorderLayout.CENTER);
+        p.add(txt,  BorderLayout.CENTER);
         return p;
     }
 
@@ -142,7 +137,6 @@ private JPanel buildSummaryRow() {
 
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         left.setOpaque(false);
-
         JLabel title = new JLabel("Product Inventory");
         title.setFont(AppFonts.CARD_TITLE);
         title.setForeground(AppColors.TEXT_PRIMARY);
@@ -152,7 +146,6 @@ private JPanel buildSummaryRow() {
         searchField.setPreferredSize(new Dimension(210, 34));
         searchField.setBorder(UIFactory.inputBorder());
         searchField.setToolTipText("Search products...");
-        // EBT: KeyListener — live search
         searchField.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) { applyFilters(); }
         });
@@ -160,7 +153,6 @@ private JPanel buildSummaryRow() {
         String[] cats = {"All Categories","Electronics","Accessories","Furniture","Peripherals","Stationery"};
         categoryFilter = UIFactory.comboBox(cats);
         categoryFilter.setPreferredSize(new Dimension(155, 34));
-        // EBT: ActionListener — category filter
         categoryFilter.addActionListener(e -> applyFilters());
 
         left.add(title);
@@ -169,7 +161,7 @@ private JPanel buildSummaryRow() {
         left.add(categoryFilter);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-right.setOpaque(false);
+        right.setOpaque(false);
         JButton addBtn = UIFactory.primaryButton("+ Add Product");
         addBtn.addActionListener(e -> openAddDialog());
         JButton refreshBtn = UIFactory.secondaryButton("\u21BB Refresh");
@@ -181,7 +173,7 @@ right.setOpaque(false);
         toolbar.add(right, BorderLayout.EAST);
         card.add(toolbar,  BorderLayout.NORTH);
 
-        // Table
+        // Build table
         model = new DefaultTableModel(COLS, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
@@ -192,12 +184,12 @@ right.setOpaque(false);
         for (int i = 0; i < widths.length && i < table.getColumnCount(); i++)
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
-        // Alternating row renderer for text columns
+        // Text column renderers
         DefaultTableCellRenderer alt = UIFactory.altRowRenderer();
         for (int i = 0; i < 7; i++)
             table.getColumnModel().getColumn(i).setCellRenderer(alt);
 
-        // Stock bar renderer (col 7) — uses ProductBean stored in model
+        // Stock bar renderer (col 7)
         table.getColumnModel().getColumn(7).setCellRenderer((t, v, sel, foc, row, col) -> {
             if (!(v instanceof ProductBean)) return new JLabel();
             ProductBean p = (ProductBean) v;
@@ -227,16 +219,32 @@ right.setOpaque(false);
         // Status badge renderer (col 8)
         table.getColumnModel().getColumn(8).setCellRenderer(UIFactory.badgeRenderer());
 
-        // Action buttons (col 9)
+        // Actions renderer (col 9) — just draws the buttons visually
         table.getColumnModel().getColumn(9).setCellRenderer(new ActionsRenderer());
-        table.getColumnModel().getColumn(9).setCellEditor(new ActionsEditor(this));
 
-        // EBT: MouseListener — double-click for details
+        // ── SINGLE MOUSE LISTENER handles everything ──────────────────────────
         table.addMouseListener(new MouseAdapter() {
+            @Override
             public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    int row = table.getSelectedRow();
-                    if (row >= 0) showProductDetails(row);
+                int row = table.rowAtPoint(e.getPoint());
+                int col = table.columnAtPoint(e.getPoint());
+                if (row < 0) return;
+
+                if (col == COL_ACTIONS) {
+                    // Determine which button was clicked based on X position
+                    Rectangle cellRect = table.getCellRect(row, col, false);
+                    int xInCell = e.getX() - cellRect.x;
+                    int cellWidth = cellRect.width;
+
+                    // Left half = Edit, Right half = Del
+                    if (xInCell < cellWidth / 2) {
+                        editProduct(row);
+                    } else {
+                        deleteProduct(row);
+                    }
+                } else if (e.getClickCount() == 2) {
+                    // Double click on any other column = show details
+                    showProductDetails(row);
                 }
             }
         });
@@ -248,14 +256,14 @@ right.setOpaque(false);
         footer.setBackground(AppColors.BG_ROW_ALT);
         footer.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, AppColors.BORDER));
         footer.add(UIFactory.mutedLabel(
-            "Showing " + allProducts.size() + " products  •  Double-click a row for details"));
+            "Showing " + allProducts.size() + " products  •  " +
+            "Click Edit/Del buttons  •  Double-click row for details"));
         card.add(footer, BorderLayout.SOUTH);
 
         return card;
     }
-// ── FIXED: refreshTable now also updates displayedProducts ───────────────
+
     private void refreshTable(List<ProductBean> list) {
-        // CRITICAL FIX: keep displayedProducts in sync with what table shows
         displayedProducts = new ArrayList<>(list);
         model.setRowCount(0);
         for (ProductBean p : list) {
@@ -269,20 +277,16 @@ right.setOpaque(false);
                 reserved,
                 available,
                 p.getReorderLevel(),
-                p,                      // passed to bar renderer
+                p,
                 p.getStockStatus(),
-                "ACTIONS"
+                "Edit | Del"
             });
         }
     }
 
-    // ── FIXED: applyFilters calls refreshTable which sets displayedProducts ──
     private void applyFilters() {
-        String q   = searchField != null ? searchField.getText().toLowerCase() : "";
-        String cat = categoryFilter != null
-            ? (String) categoryFilter.getSelectedItem()
-            : "All Categories";
-
+        String q   = searchField   != null ? searchField.getText().toLowerCase() : "";
+        String cat = categoryFilter != null ? (String) categoryFilter.getSelectedItem() : "All Categories";
         List<ProductBean> filtered = new ArrayList<>();
         for (ProductBean p : allProducts) {
             boolean matchQ = p.getProductName().toLowerCase().contains(q)
@@ -290,7 +294,7 @@ right.setOpaque(false);
             boolean matchC = "All Categories".equals(cat) || p.getCategory().equals(cat);
             if (matchQ && matchC) filtered.add(p);
         }
-        refreshTable(filtered); // this sets displayedProducts
+        refreshTable(filtered);
     }
 
     private void openAddDialog() {
@@ -301,7 +305,8 @@ right.setOpaque(false);
             boolean saved = productDAO.addProduct(p);
             if (saved) {
                 JOptionPane.showMessageDialog(this,
-                    "Product added to database!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                    "Product added to database!", "Success",
+                    JOptionPane.INFORMATION_MESSAGE);
                 loadFromDB();
             } else {
                 p.setProductId(allProducts.size() + 1);
@@ -311,10 +316,9 @@ right.setOpaque(false);
         }
     }
 
-    // ── FIXED: uses displayedProducts.get(row) — always correct ─────────────
-    void editProduct(int row) {
+    private void editProduct(int row) {
         if (row < 0 || row >= displayedProducts.size()) return;
-        ProductBean existing = displayedProducts.get(row); // FIXED
+        ProductBean existing = displayedProducts.get(row);
         AddProductDialog dlg = new AddProductDialog(
             SwingUtilities.getWindowAncestor(this), existing);
         dlg.setVisible(true);
@@ -322,7 +326,6 @@ right.setOpaque(false);
             ProductBean updated = dlg.getProduct();
             updated.setProductId(existing.getProductId());
             productDAO.updateProduct(updated);
-            // Update in master list
             for (int i = 0; i < allProducts.size(); i++) {
                 if (allProducts.get(i).getProductId() == existing.getProductId()) {
                     allProducts.set(i, updated);
@@ -333,10 +336,9 @@ right.setOpaque(false);
         }
     }
 
-    // ── FIXED: uses displayedProducts.get(row) ───────────────────────────────
-    void deleteProduct(int row) {
+    private void deleteProduct(int row) {
         if (row < 0 || row >= displayedProducts.size()) return;
-        ProductBean p = displayedProducts.get(row); // FIXED
+        ProductBean p = displayedProducts.get(row);
         ConfirmDialog dlg = new ConfirmDialog(
             SwingUtilities.getWindowAncestor(this),
             "Delete Product",
@@ -348,99 +350,47 @@ right.setOpaque(false);
             applyFilters();
         }
     }
-private void showProductDetails(int row) {
+
+    private void showProductDetails(int row) {
         if (row < 0 || row >= displayedProducts.size()) return;
-        ProductBean p = displayedProducts.get(row); // FIXED
+        ProductBean p = displayedProducts.get(row);
         JOptionPane.showMessageDialog(this,
-            "Product:     " + p.getProductName()
-            + "\nCategory:    " + p.getCategory()
-            + "\nIn Stock:    " + p.getQuantity()
-            + "\nPrice:       $" + String.format("%.2f", p.getPrice())
-            + "\nReorder Lvl: " + p.getReorderLevel()
-            + "\nStatus:      " + p.getStockStatus(),
+            "Product:      " + p.getProductName()
+            + "\nCategory:     " + p.getCategory()
+            + "\nIn Stock:     " + p.getQuantity()
+            + "\nPrice:        $" + String.format("%.2f", p.getPrice())
+            + "\nReorder Lvl:  " + p.getReorderLevel()
+            + "\nStatus:       " + p.getStockStatus(),
             "Product Details", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // ── Inner Renderers & Editor ──────────────────────────────────────────────
-
+    // ── Renderer only — draws Edit | Del buttons visually ────────────────────
     static class ActionsRenderer implements TableCellRenderer {
-        JPanel p;
 
-        ActionsRenderer() {
-            p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
-
-            JButton e = new JButton("Edit");
-            e.setFont(AppFonts.SMALL_BOLD);
-            e.setForeground(AppColors.INFO_TEXT);
-            e.setBackground(AppColors.INFO_BG);
-            e.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-
-            JButton d = new JButton("Del");
-            d.setFont(AppFonts.SMALL_BOLD);
-            d.setForeground(AppColors.DANGER_TEXT);
-            d.setBackground(AppColors.DANGER_BG);
-            d.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-
-            p.add(e);
-            p.add(d);
-        }
-
+        @Override
         public Component getTableCellRendererComponent(JTable t, Object v,
                 boolean sel, boolean foc, int row, int col) {
-            p.setBackground(row % 2 == 0 ? Color.WHITE : AppColors.BG_ROW_ALT);
-            return p;
+
+            JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
+            panel.setBackground(row % 2 == 0 ? Color.WHITE : AppColors.BG_ROW_ALT);
+
+            JButton editBtn = new JButton("Edit");
+            editBtn.setFont(AppFonts.SMALL_BOLD);
+            editBtn.setForeground(AppColors.INFO_TEXT);
+            editBtn.setBackground(AppColors.INFO_BG);
+            editBtn.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
+            editBtn.setFocusPainted(false);
+
+            JButton delBtn = new JButton("Del");
+            delBtn.setFont(AppFonts.SMALL_BOLD);
+            delBtn.setForeground(AppColors.DANGER_TEXT);
+            delBtn.setBackground(AppColors.DANGER_BG);
+            delBtn.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
+            delBtn.setFocusPainted(false);
+
+            panel.add(editBtn);
+            panel.add(delBtn);
+            return panel;
         }
     }
-
-    static class ActionsEditor extends DefaultCellEditor {
-
-        JPanel p;
-        int curRow;
-        InventoryFrame frame;
-
-        ActionsEditor(InventoryFrame f) {
-            super(new JCheckBox());
-            setClickCountToStart(1);
-            this.frame = f;
-
-            p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
-
-            JButton e = new JButton("Edit");
-            e.setFont(AppFonts.SMALL_BOLD);
-            e.setForeground(AppColors.INFO_TEXT);
-            e.setBackground(AppColors.INFO_BG);
-            e.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-            e.setFocusPainted(false);
-            e.addActionListener(ev -> {
-                fireEditingStopped();
-                frame.editProduct(curRow);
-            });
-
-            JButton d = new JButton("Del");
-            d.setFont(AppFonts.SMALL_BOLD);
-            d.setForeground(AppColors.DANGER_TEXT);
-            d.setBackground(AppColors.DANGER_BG);
-            d.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-            d.setFocusPainted(false);
-            d.addActionListener(ev -> {
-                fireEditingStopped();
-                frame.deleteProduct(curRow);
-            });
-
-            p.add(e);
-            p.add(d);
-        }
-
-        public Component getTableCellEditorComponent(JTable t, Object v,
-                boolean sel, int row, int col) {
-            curRow = row;
-            return p;
-        }
-
-        public Object getCellEditorValue() {
-            return "ACTIONS";
-        }
-    }
-
-}  
-
+}

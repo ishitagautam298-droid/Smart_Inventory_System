@@ -16,12 +16,6 @@ import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * JFC: Supplier management page.
- * JDBC: SupplierDAO integration.
- * EBT: ActionListener, KeyListener.
- * Runtime fix: displayedSuppliers tracks exactly what is shown in table.
- */
 public class SupplierFrame extends JPanel {
 
     private JTable            table;
@@ -29,7 +23,6 @@ public class SupplierFrame extends JPanel {
     private JTextField        searchField;
     private JComboBox<String> statusFilter;
 
-    // FIXED: separate displayed list
     private List<SupplierBean> allSuppliers       = new ArrayList<>();
     private List<SupplierBean> displayedSuppliers = new ArrayList<>();
 
@@ -38,6 +31,8 @@ public class SupplierFrame extends JPanel {
     private static final String[] COLS = {
         "#","Supplier Name","Contact Person","Email","Phone","Category","Lead","Status","Actions"
     };
+
+    private static final int COL_ACTIONS = 8;
 
     public SupplierFrame() {
         setBackground(AppColors.BG_APP);
@@ -80,19 +75,20 @@ public class SupplierFrame extends JPanel {
         card.setBackground(AppColors.BG_CARD);
         card.setBorder(UIFactory.cardBorder());
 
+        // Toolbar
         JPanel bar = new JPanel(new BorderLayout());
         bar.setBackground(AppColors.BG_CARD);
         bar.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0,0,1,0,AppColors.BORDER),
-            BorderFactory.createEmptyBorder(12,18,12,18)));
+            BorderFactory.createMatteBorder(0, 0, 1, 0, AppColors.BORDER),
+            BorderFactory.createEmptyBorder(12, 18, 12, 18)));
 
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         left.setOpaque(false);
-
         JLabel title = new JLabel("All Suppliers");
         title.setFont(AppFonts.CARD_TITLE);
         title.setForeground(AppColors.TEXT_PRIMARY);
-searchField = new JTextField(18);
+
+        searchField = new JTextField(18);
         searchField.setFont(AppFonts.INPUT);
         searchField.setPreferredSize(new Dimension(210, 34));
         searchField.setBorder(UIFactory.inputBorder());
@@ -123,43 +119,72 @@ searchField = new JTextField(18);
         bar.add(right, BorderLayout.EAST);
         card.add(bar, BorderLayout.NORTH);
 
+        // Table
         model = new DefaultTableModel(COLS, 0) {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         table = new JTable(model);
         UIFactory.styleTable(table);
 
-        int[] widths = {40,145,115,165,95,100,65,80,110};
+        int[] widths = {40,145,115,165,95,100,65,80,120};
         for (int i = 0; i < widths.length; i++)
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
 
         DefaultTableCellRenderer alt = UIFactory.altRowRenderer();
-        for (int i = 0; i < 7; i++) table.getColumnModel().getColumn(i).setCellRenderer(alt);
+        for (int i = 0; i < 7; i++)
+            table.getColumnModel().getColumn(i).setCellRenderer(alt);
+
         table.getColumnModel().getColumn(7).setCellRenderer(UIFactory.badgeRenderer());
-        table.getColumnModel().getColumn(8).setCellRenderer(new ActRenderer());
-        table.getColumnModel().getColumn(8).setCellEditor(new ActEditor(this));
+        table.getColumnModel().getColumn(8).setCellRenderer(new SupplierActionsRenderer());
+
+        // ── SINGLE MOUSE LISTENER ─────────────────────────────────────────────
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                int row = table.rowAtPoint(e.getPoint());
+                int col = table.columnAtPoint(e.getPoint());
+                if (row < 0) return;
+
+                if (col == COL_ACTIONS) {
+                    Rectangle cellRect  = table.getCellRect(row, col, false);
+                    int xInCell   = e.getX() - cellRect.x;
+                    int cellWidth = cellRect.width;
+
+                    // Left half = Edit, Right half = Delete
+                    if (xInCell < cellWidth / 2) {
+                        editSupplier(row);
+                    } else {
+                        deleteSupplier(row);
+                    }
+                }
+            }
+        });
 
         card.add(UIFactory.scrollPane(table), BorderLayout.CENTER);
         return card;
     }
 
-    // FIXED: also updates displayedSuppliers
     private void refreshTable(List<SupplierBean> list) {
-        displayedSuppliers = new ArrayList<>(list); // FIXED
+        displayedSuppliers = new ArrayList<>(list);
         model.setRowCount(0);
         for (SupplierBean s : list) {
             model.addRow(new Object[]{
-                "#" + s.getSupplierId(), s.getSupplierName(), s.getContactPerson(),
-                s.getEmail(), s.getPhone(), s.getProductCategory(),
-                s.getLeadTimeDays() + " days", s.getStatus(), "ACTIONS"
+                "#" + s.getSupplierId(),
+                s.getSupplierName(),
+                s.getContactPerson(),
+                s.getEmail(),
+                s.getPhone(),
+                s.getProductCategory(),
+                s.getLeadTimeDays() + " days",
+                s.getStatus(),
+                "Edit | Del"
             });
         }
     }
 
     private void applyFilters() {
-        String q   = searchField  != null ? searchField.getText().toLowerCase()        : "";
-        String sel = statusFilter != null ? (String) statusFilter.getSelectedItem()    : "All";
-
+        String q   = searchField  != null ? searchField.getText().toLowerCase()     : "";
+        String sel = statusFilter != null ? (String) statusFilter.getSelectedItem() : "All";
         List<SupplierBean> filtered = new ArrayList<>();
         for (SupplierBean s : allSuppliers) {
             boolean matchQ = s.getSupplierName().toLowerCase().contains(q)
@@ -186,28 +211,28 @@ searchField = new JTextField(18);
             }
         }
     }
-// FIXED: uses displayedSuppliers.get(row)
-    void editSupplier(int row) {
+
+    private void editSupplier(int row) {
         if (row < 0 || row >= displayedSuppliers.size()) return;
-        SupplierBean s = displayedSuppliers.get(row); // FIXED
+        SupplierBean s = displayedSuppliers.get(row);
         JOptionPane.showMessageDialog(this,
-            "Edit: " + s.getSupplierName()
-            + "\nContact: " + s.getContactPerson()
-            + "\nEmail: "   + s.getEmail()
-            + "\nPhone: "   + s.getPhone()
-            + "\nCategory: "+ s.getProductCategory()
-            + "\nLead Time: "+ s.getLeadTimeDays() + " days"
-            + "\nStatus: "  + s.getStatus(),
+            "Supplier:  " + s.getSupplierName()
+            + "\nContact:   " + s.getContactPerson()
+            + "\nEmail:     " + s.getEmail()
+            + "\nPhone:     " + s.getPhone()
+            + "\nCategory:  " + s.getProductCategory()
+            + "\nLead Time: " + s.getLeadTimeDays() + " days"
+            + "\nStatus:    " + s.getStatus(),
             "Supplier Details", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    // FIXED: uses displayedSuppliers.get(row)
-    void deleteSupplier(int row) {
+    private void deleteSupplier(int row) {
         if (row < 0 || row >= displayedSuppliers.size()) return;
-        SupplierBean s = displayedSuppliers.get(row); // FIXED
+        SupplierBean s = displayedSuppliers.get(row);
         ConfirmDialog dlg = new ConfirmDialog(
             SwingUtilities.getWindowAncestor(this),
-            "Delete Supplier", "Delete \"" + s.getSupplierName() + "\"?");
+            "Delete Supplier",
+            "Delete \"" + s.getSupplierName() + "\"?");
         dlg.setVisible(true);
         if (dlg.isConfirmed()) {
             supplierDAO.deleteSupplier(s.getSupplierId());
@@ -216,45 +241,30 @@ searchField = new JTextField(18);
         }
     }
 
-    static class ActRenderer implements TableCellRenderer {
-        JPanel p;
-        ActRenderer() {
-            p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
-            JButton e = new JButton("Edit");
-            e.setFont(AppFonts.SMALL_BOLD); e.setForeground(AppColors.INFO_TEXT);
-            e.setBackground(AppColors.INFO_BG); e.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
-            JButton d = new JButton("Del");
-            d.setFont(AppFonts.SMALL_BOLD); d.setForeground(AppColors.DANGER_TEXT);
-            d.setBackground(AppColors.DANGER_BG); d.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
-            p.add(e); p.add(d);
-        }
+    static class SupplierActionsRenderer implements TableCellRenderer {
+        @Override
         public Component getTableCellRendererComponent(JTable t, Object v,
                 boolean sel, boolean foc, int row, int col) {
-            p.setBackground(row % 2 == 0 ? Color.WHITE : AppColors.BG_ROW_ALT);
-            return p;
-        }
-    }
+            JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
+            panel.setBackground(row % 2 == 0 ? Color.WHITE : AppColors.BG_ROW_ALT);
 
-    static class ActEditor extends DefaultCellEditor {
-        JPanel p; int curRow; SupplierFrame frame;
-        ActEditor(SupplierFrame f) {
-            super(new JCheckBox()); this.frame = f;
-            p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
-            JButton e = new JButton("Edit");
-            e.setFont(AppFonts.SMALL_BOLD); e.setForeground(AppColors.INFO_TEXT);
-            e.setBackground(AppColors.INFO_BG); e.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
-            e.setFocusPainted(false);
-            e.addActionListener(ev -> { fireEditingStopped(); frame.editSupplier(curRow); });
-            JButton d = new JButton("Del");
-            d.setFont(AppFonts.SMALL_BOLD); d.setForeground(AppColors.DANGER_TEXT);
-            d.setBackground(AppColors.DANGER_BG); d.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
-            d.setFocusPainted(false);
-            d.addActionListener(ev -> { fireEditingStopped(); frame.deleteSupplier(curRow); });
-            p.add(e); p.add(d);
+            JButton editBtn = new JButton("Edit");
+            editBtn.setFont(AppFonts.SMALL_BOLD);
+            editBtn.setForeground(AppColors.INFO_TEXT);
+            editBtn.setBackground(AppColors.INFO_BG);
+            editBtn.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
+            editBtn.setFocusPainted(false);
+
+            JButton delBtn = new JButton("Del");
+            delBtn.setFont(AppFonts.SMALL_BOLD);
+            delBtn.setForeground(AppColors.DANGER_TEXT);
+            delBtn.setBackground(AppColors.DANGER_BG);
+            delBtn.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
+            delBtn.setFocusPainted(false);
+
+            panel.add(editBtn);
+            panel.add(delBtn);
+            return panel;
         }
-        public Component getTableCellEditorComponent(JTable t, Object v,
-                boolean sel, int row, int col) { curRow = row; return p; }
-        public Object getCellEditorValue() { return "ACTIONS"; }
     }
 }
-
