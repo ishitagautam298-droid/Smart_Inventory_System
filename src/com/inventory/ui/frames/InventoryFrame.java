@@ -365,16 +365,26 @@ private void showProductDetails(int row) {
 
     static class ActionsRenderer implements TableCellRenderer {
         JPanel p;
+
         ActionsRenderer() {
             p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
+
             JButton e = new JButton("Edit");
-            e.setFont(AppFonts.SMALL_BOLD); e.setForeground(AppColors.INFO_TEXT);
-            e.setBackground(AppColors.INFO_BG); e.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
+            e.setFont(AppFonts.SMALL_BOLD);
+            e.setForeground(AppColors.INFO_TEXT);
+            e.setBackground(AppColors.INFO_BG);
+            e.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+
             JButton d = new JButton("Del");
-            d.setFont(AppFonts.SMALL_BOLD); d.setForeground(AppColors.DANGER_TEXT);
-            d.setBackground(AppColors.DANGER_BG); d.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
-            p.add(e); p.add(d);
+            d.setFont(AppFonts.SMALL_BOLD);
+            d.setForeground(AppColors.DANGER_TEXT);
+            d.setBackground(AppColors.DANGER_BG);
+            d.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+
+            p.add(e);
+            p.add(d);
         }
+
         public Component getTableCellRendererComponent(JTable t, Object v,
                 boolean sel, boolean foc, int row, int col) {
             p.setBackground(row % 2 == 0 ? Color.WHITE : AppColors.BG_ROW_ALT);
@@ -383,26 +393,54 @@ private void showProductDetails(int row) {
     }
 
     static class ActionsEditor extends DefaultCellEditor {
-        JPanel p; int curRow; InventoryFrame frame;
+
+        JPanel p;
+        int curRow;
+        InventoryFrame frame;
+
         ActionsEditor(InventoryFrame f) {
-            super(new JCheckBox()); this.frame = f;
+            super(new JCheckBox());
+            setClickCountToStart(1);
+            this.frame = f;
+
             p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
+
             JButton e = new JButton("Edit");
-            e.setFont(AppFonts.SMALL_BOLD); e.setForeground(AppColors.INFO_TEXT);
-            e.setBackground(AppColors.INFO_BG); e.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
+            e.setFont(AppFonts.SMALL_BOLD);
+            e.setForeground(AppColors.INFO_TEXT);
+            e.setBackground(AppColors.INFO_BG);
+            e.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
             e.setFocusPainted(false);
-            e.addActionListener(ev -> { fireEditingStopped(); frame.editProduct(curRow); });
+            e.addActionListener(ev -> {
+                fireEditingStopped();
+                frame.editProduct(curRow);
+            });
+
             JButton d = new JButton("Del");
-            d.setFont(AppFonts.SMALL_BOLD); d.setForeground(AppColors.DANGER_TEXT);
-            d.setBackground(AppColors.DANGER_BG); d.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
+            d.setFont(AppFonts.SMALL_BOLD);
+            d.setForeground(AppColors.DANGER_TEXT);
+            d.setBackground(AppColors.DANGER_BG);
+            d.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
             d.setFocusPainted(false);
-            d.addActionListener(ev -> { fireEditingStopped(); frame.deleteProduct(curRow); });
-            p.add(e); p.add(d);
+            d.addActionListener(ev -> {
+                fireEditingStopped();
+                frame.deleteProduct(curRow);
+            });
+
+            p.add(e);
+            p.add(d);
         }
+
         public Component getTableCellEditorComponent(JTable t, Object v,
                 boolean sel, int row, int col) {
-            curRow = row; return p;
+            curRow = row;
+            return p;
         }
-        public Object getCellEditorValue() { return "ACTIONS"; }
+
+        public Object getCellEditorValue() {
+            return "ACTIONS";
+        }
     }
-}
+
+}  
+

@@ -2,7 +2,14 @@ package com.inventory.ui.panels;
 
 import com.inventory.ui.theme.AppColors;
 import com.inventory.ui.theme.AppFonts;
-import com.inventory.ui.frames.*;
+import com.inventory.ui.frames.DashboardFrame;
+import com.inventory.ui.frames.InventoryFrame;
+import com.inventory.ui.frames.OrderFrame;
+import com.inventory.ui.frames.SupplierFrame;
+import com.inventory.ui.frames.ShipmentFrame;
+import com.inventory.ui.frames.ReportFrame;
+import com.inventory.ui.frames.SettingsFrame;
+import com.inventory.ui.frames.LoginFrame;
 
 import javax.swing.*;
 import java.awt.*;
@@ -38,10 +45,12 @@ public class SidebarPanel extends JPanel {
         add(buildFooter(), BorderLayout.SOUTH);
     }
 
+    // ── Logo ──────────────────────────────────────────────────────────────────
     private JPanel buildLogo() {
         JPanel logo = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 16));
         logo.setBackground(AppColors.SIDEBAR_BG);
-        logo.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(31, 41, 55)));
+        logo.setBorder(BorderFactory.createMatteBorder(
+            0, 0, 1, 0, new Color(31, 41, 55)));
 
         JLabel icon = new JLabel("\uD83D\uDCE6");
         icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 22));
@@ -49,20 +58,23 @@ public class SidebarPanel extends JPanel {
         JPanel text = new JPanel();
         text.setOpaque(false);
         text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+
         JLabel name = new JLabel("SmartStock");
         name.setFont(AppFonts.APP_NAME);
         name.setForeground(AppColors.TEXT_WHITE);
-        JLabel sub  = new JLabel("Inventory Suite v2.0");
+
+        JLabel sub = new JLabel("Inventory Suite v2.0");
         sub.setFont(new Font("Segoe UI", Font.PLAIN, 10));
         sub.setForeground(AppColors.SIDEBAR_SECT);
+
         text.add(name);
         text.add(sub);
-
         logo.add(icon);
         logo.add(text);
         return logo;
     }
 
+    // ── Menu ──────────────────────────────────────────────────────────────────
     private JPanel buildMenu() {
         JPanel menu = new JPanel();
         menu.setBackground(AppColors.SIDEBAR_BG);
@@ -99,14 +111,16 @@ public class SidebarPanel extends JPanel {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
                 if (label.equals(activeLabel)) {
                     g2.setColor(AppColors.SIDEBAR_ACTIVE);
-                    g2.fillRoundRect(8, 2, getWidth() - 16, getHeight() - 4, 8, 8);
+                    g2.fillRoundRect(8, 2, getWidth()-16, getHeight()-4, 8, 8);
                     // Left accent bar
                     g2.setColor(new Color(165, 180, 252));
-g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    g2.drawLine(3, 8, 3, getHeight() - 8);
+                    g2.setStroke(new BasicStroke(3,
+                        BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g2.drawLine(3, 8, 3, getHeight()-8);
                 }
                 g2.dispose();
                 super.paintComponent(g);
@@ -124,7 +138,9 @@ g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         iconLbl.setForeground(active ? AppColors.TEXT_WHITE : AppColors.SIDEBAR_TEXT);
 
         JLabel textLbl = new JLabel(label);
-        textLbl.setFont(active ? new Font("Segoe UI", Font.BOLD, 13) : AppFonts.SIDEBAR);
+        textLbl.setFont(active
+            ? new Font("Segoe UI", Font.BOLD, 13)
+            : AppFonts.SIDEBAR);
         textLbl.setForeground(active ? AppColors.TEXT_WHITE : AppColors.SIDEBAR_TEXT);
 
         item.add(iconLbl);
@@ -134,16 +150,20 @@ g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         item.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if ("Logout".equals(label))   { handleLogout(); return; }
-                if ("Settings".equals(label)) { return; }
+                if ("Logout".equals(label)) {
+                    handleLogout();
+                    return;
+                }
                 activeLabel = label;
                 navigateTo(label);
             }
+
             @Override
             public void mouseEntered(MouseEvent e) {
                 if (!label.equals(activeLabel))
                     item.setBackground(AppColors.SIDEBAR_HOVER);
             }
+
             @Override
             public void mouseExited(MouseEvent e) {
                 item.setBackground(AppColors.SIDEBAR_BG);
@@ -163,15 +183,19 @@ g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             case "Suppliers": page = new SupplierFrame();  break;
             case "Shipments": page = new ShipmentFrame();  break;
             case "Reports":   page = new ReportFrame();    break;
+            case "Settings":  page = new SettingsFrame();  break; // ← WORKS NOW
             default: return;
         }
+
         // Rebuild sidebar to update active highlight
         removeAll();
         add(buildLogo(),   BorderLayout.NORTH);
         add(buildMenu(),   BorderLayout.CENTER);
         add(buildFooter(), BorderLayout.SOUTH);
-        revalidate(); repaint();
+        revalidate();
+        repaint();
 
+        // Switch content area to new page
         contentArea.removeAll();
         contentArea.add(page, BorderLayout.CENTER);
         contentArea.revalidate();
@@ -179,27 +203,33 @@ g2.setStroke(new BasicStroke(3, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
     }
 
     private void handleLogout() {
-        int confirm = JOptionPane.showConfirmDialog(this,
-            "Are you sure you want to logout?", "Confirm Logout",
-            JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+        int confirm = JOptionPane.showConfirmDialog(
+            this,
+            "Are you sure you want to logout?",
+            "Confirm Logout",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE);
         if (confirm == JOptionPane.YES_OPTION) {
             SwingUtilities.getWindowAncestor(this).dispose();
             new LoginFrame();
         }
     }
 
+    // ── Footer ────────────────────────────────────────────────────────────────
     private JPanel buildFooter() {
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT, 14, 12));
         footer.setBackground(new Color(10, 14, 23));
-        footer.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(31, 41, 55)));
+        footer.setBorder(BorderFactory.createMatteBorder(
+            1, 0, 0, 0, new Color(31, 41, 55)));
 
-        // AWT: Drawing avatar circle using Graphics
+        // AWT: Custom drawn avatar circle
         JLabel avatar = new JLabel("A", SwingConstants.CENTER) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-g2.setColor(AppColors.PRIMARY);
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(AppColors.PRIMARY);
                 g2.fillOval(0, 0, getWidth(), getHeight());
                 g2.dispose();
                 super.paintComponent(g);

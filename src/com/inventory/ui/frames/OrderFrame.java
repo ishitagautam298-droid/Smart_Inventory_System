@@ -263,16 +263,26 @@ for (int i = 0; i < 6; i++) table.getColumnModel().getColumn(i).setCellRenderer(
 
     static class ActRenderer implements TableCellRenderer {
         JPanel p;
+
         ActRenderer() {
             p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
+
             JButton v = new JButton("View");
-            v.setFont(AppFonts.SMALL_BOLD); v.setForeground(AppColors.INFO_TEXT);
-v.setBackground(AppColors.INFO_BG); v.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
+            v.setFont(AppFonts.SMALL_BOLD);
+            v.setForeground(AppColors.INFO_TEXT);
+            v.setBackground(AppColors.INFO_BG);
+            v.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+
             JButton c = new JButton("Cancel");
-            c.setFont(AppFonts.SMALL_BOLD); c.setForeground(AppColors.DANGER_TEXT);
-            c.setBackground(AppColors.DANGER_BG); c.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
-            p.add(v); p.add(c);
+            c.setFont(AppFonts.SMALL_BOLD);
+            c.setForeground(AppColors.DANGER_TEXT);
+            c.setBackground(AppColors.DANGER_BG);
+            c.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+
+            p.add(v);
+            p.add(c);
         }
+
         public Component getTableCellRendererComponent(JTable t, Object v,
                 boolean sel, boolean foc, int row, int col) {
             p.setBackground(row % 2 == 0 ? Color.WHITE : AppColors.BG_ROW_ALT);
@@ -281,24 +291,53 @@ v.setBackground(AppColors.INFO_BG); v.setBorder(BorderFactory.createEmptyBorder(
     }
 
     static class ActEditor extends DefaultCellEditor {
-        JPanel p; int curRow; OrderFrame frame;
+
+        JPanel p;
+        int curRow;
+        OrderFrame frame;
+
         ActEditor(OrderFrame f) {
-            super(new JCheckBox()); this.frame = f;
+            super(new JCheckBox());
+            setClickCountToStart(1);
+            this.frame = f;
+
             p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 7));
+
             JButton v = new JButton("View");
-            v.setFont(AppFonts.SMALL_BOLD); v.setForeground(AppColors.INFO_TEXT);
-            v.setBackground(AppColors.INFO_BG); v.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
+            v.setFont(AppFonts.SMALL_BOLD);
+            v.setForeground(AppColors.INFO_TEXT);
+            v.setBackground(AppColors.INFO_BG);
+            v.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
             v.setFocusPainted(false);
-            v.addActionListener(e -> { fireEditingStopped(); frame.viewOrder(curRow); });
+            v.addActionListener(e -> {
+                fireEditingStopped();
+                frame.viewOrder(curRow);
+            });
+
             JButton c = new JButton("Cancel");
-            c.setFont(AppFonts.SMALL_BOLD); c.setForeground(AppColors.DANGER_TEXT);
-            c.setBackground(AppColors.DANGER_BG); c.setBorder(BorderFactory.createEmptyBorder(3,8,3,8));
+            c.setFont(AppFonts.SMALL_BOLD);
+            c.setForeground(AppColors.DANGER_TEXT);
+            c.setBackground(AppColors.DANGER_BG);
+            c.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
             c.setFocusPainted(false);
-            c.addActionListener(e -> { fireEditingStopped(); frame.cancelOrder(curRow); });
-            p.add(v); p.add(c);
+            c.addActionListener(e -> {
+                fireEditingStopped();
+                frame.cancelOrder(curRow);
+            });
+
+            p.add(v);
+            p.add(c);
         }
+
         public Component getTableCellEditorComponent(JTable t, Object v,
-                boolean sel, int row, int col) { curRow = row; return p; }
-        public Object getCellEditorValue() { return "ACTIONS"; }
+                boolean sel, int row, int col) {
+            curRow = row;
+            return p;
+        }
+
+        public Object getCellEditorValue() {
+            return "ACTIONS";
+        }
     }
+
 }
